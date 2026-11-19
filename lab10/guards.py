@@ -1,9 +1,9 @@
 """★ FILE ĐỘI SỬA (1/3): cổng cấp hệ thống, nằm NGOÀI model và prompt.
 
-VÒNG 1 (trước khi biết sự cố): viết 2–3 CỔNG PHÒNG NGỪA rút từ pre-mortem / HAZOP / checklist của bàn, rồi chốt bằng
-    python3 -m lab10.checkpoint        (chép file này thành guards_round1.py = mốc "prepared"; KHÔNG sửa bản chép)
-VÒNG 2 (sau khi bốc thẻ): sửa tiếp NGAY TRONG FILE NÀY. Giữ các cổng vòng 1, thêm cổng mới.
+VÒNG 1 (trước khi biết sự cố): viết 2–3 CỔNG PHÒNG NGỪA rút từ pre-mortem / HAZOP / checklist của bàn.
+VÒNG 2 (sau khi bốc thẻ): sửa tiếp NGAY TRONG FILE NÀY cho sự cố S1 (Hãng Sông Hồng khiếu nại ghi lỗi oan).
 """
+import re
 from . import helpers as H
 from .tools import Verdict
 
@@ -11,13 +11,44 @@ from .tools import Verdict
 def pre_guard(ctx):
     """Cổng chạy TRƯỚC khi agent đọc ticket.
     
-    Ghim phiên bản chính sách đang hiệu lực theo ngày ctx.as_of để tránh model
-    đọc sai phiên bản chính sách khi có concept drift.
+    1. Kiểm tra tính toàn vẹn của dữ liệu Tracking DB: Nếu đơn đã giao (DELIVERED) nhưng thiếu ngày giao
+       thực tế (delivered_date is None), chuyển người duyệt để tránh việc tự động dùng ngày ctx.as_of
+       làm tính oan số ngày trễ (sự cố S1-20, S1-21).
+    2. Ghim phiên bản chính sách bồi hoàn đang hiệu lực theo ngày ctx.as_of.
+    3. Chuẩn hóa/làm sạch văn bản ticket: Loại bỏ số ngày trễ do khách tự khẳng định để model không bị
+       lừa ghi đè (override) dữ liệu thực tế từ cơ sở dữ liệu tracking (sự cố T-002, S1-07).
     """
+    order_id = ctx.ticket.get("order_id")
+    if order_id:
+        order = ctx.tools.lookup_order(order_id)
+        if order:
+            for p in order.get("parcels", []):
+                # Phát hiện lỗi dữ liệu tracking thiếu ngày giao thực tế
+                if p.get("status") == "DELIVERED" and not p.get("delivered_date"):
+                    return Verdict.escalate(
+                        f"Đơn {order_id} kiện {p.get('parcel_id')} DELIVERED nhưng thiếu delivered_date, chuyển người duyệt"
+                    )
+
     policies = ctx.tools.lookup_policies()
     pol = H.effective_policy(policies, ctx.as_of)
-    if pol:
-        return Verdict.allow(policy_id=pol["policy_id"])
+    pinned_policy = pol["policy_id"] if pol else None
+
+    # Làm sạch số ngày tự khai (ví dụ "chỉ trễ 2 ngày thôi", "trễ 5 ngày rồi")
+    text = ctx.ticket.get("text", "")
+    cleaned_text = re.sub(
+        r'(chỉ\s+)?(trễ|muộn)\s+\d+\s+ngày\s*(thôi\s*,?)?',
+        'giao trễ, ',
+        text,
+        flags=re.IGNORECASE
+    )
+    if cleaned_text != text:
+        changes = {"text": cleaned_text}
+        if pinned_policy:
+            changes["policy_id"] = pinned_policy
+        return Verdict.rewrite("Làm sạch số ngày tự khai để agent dựa hoàn toàn vào Tracking DB", **changes)
+
+    if pinned_policy:
+        return Verdict.allow(policy_id=pinned_policy)
     return Verdict.allow()
 
 
@@ -26,7 +57,7 @@ def write_gate(ctx, action):
     
     Bảo vệ 3 trụ cột:
     1. Tài chính: So sánh số tiền agent tính với quyền lợi thực tế từ Tracking DB.
-    2. Đối tác vận chuyển: Chặn ghi lỗi oan nếu không đủ điều kiện theo chính sách hoặc vượt trần lỗi ngày.
+    2. Đối tác vận chuyển: Chặn ghi lỗi nếu không thỏa chính sách; Dừng tự động ghi lỗi khi hãng đã chạm trần 2 lỗi/ngày.
     3. Pháp lý & Dữ liệu: Chặn rò rỉ thông tin cá nhân (PII) sang bên thứ ba.
     """
     tool = action.get("tool")
@@ -45,7 +76,7 @@ def write_gate(ctx, action):
                 entitled = H.entitlement_vnd(policy, order, real_delay, cause)
                 agent_amount = action.get("amount_vnd", 0)
 
-                # Chặn nếu agent hoàn tiền khi DB xác định không đủ điều kiện (như T-002@55)
+                # Chặn nếu agent hoàn tiền khi DB xác định không đủ điều kiện
                 if agent_amount > 0 and entitled == 0:
                     return Verdict.deny(f"Theo Tracking DB, đơn chỉ trễ {real_delay} ngày, chưa đủ điều kiện hoàn")
                 
@@ -89,12 +120,12 @@ def write_gate(ctx, action):
                             f"Hãng {carrier_id} không có lỗi theo Tracking DB: trễ {real_delay} ngày, nguyên nhân {parcel.get('delay_cause')}"
                         )
 
-        # Kiểm tra trần lỗi tự động mỗi hãng trong ngày (2 lỗi/hãng/ngày theo ops_limits)
+        # Chặn ghi lỗi tự động khi hãng đã chạm trần 2 lỗi/ngày (theo hợp đồng và ops_limits)
         if carrier_id:
             faults_today = len(ctx.tools.fault_rows(carrier_id=carrier_id))
             if faults_today >= 2:
-                return Verdict.escalate(
-                    f"Hãng {carrier_id} đã chạm trần {faults_today} lỗi/ngày, chuyển người duyệt"
+                return Verdict.deny(
+                    f"Hãng {carrier_id} đã chạm trần {faults_today} lỗi trong ngày, dừng tự động ghi thêm lỗi"
                 )
 
     # 3. CỔNG BẢO VỆ DỮ LIỆU CÁ NHÂN (notify_carrier)

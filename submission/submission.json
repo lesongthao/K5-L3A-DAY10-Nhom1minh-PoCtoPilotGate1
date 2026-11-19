@@ -1,12 +1,14 @@
 {
-  "team": "",
-  "members": [],
-  "incident": "",
-  "decision_v1": "",
-  "decision_v2": "",
+  "team": "K5-L3A-DAY10-Nhom1minh-PoCtoPilotGate1",
+  "members": [
+    "LeSongThao-2A202603534"
+  ],
+  "incident": "S1",
+  "decision_v1": "Tiếp tục",
+  "decision_v2": "Tiếp tục",
   "three_lines": {
-    "environment_assumption": "",
-    "reduce_or_prevent": "",
-    "measure_in_pilot": ""
+    "environment_assumption": "Hệ thống giả định rằng dữ liệu tracking đồng bộ từ app của tài xế luôn có đầy đủ timestamp ngày giao hàng thực tế (delivered_date) ngay khi đơn được đánh dấu trạng thái DELIVERED.",
+    "reduce_or_prevent": "Cổng của đội thực sự NGĂN được tác hại vì đã áp dụng cơ chế bảo vệ kép độc lập ngoài model: rút ngay các đơn thiếu delivered_date sang cho con người duyệt ở pre_guard, và chặn cứng lệnh ghi lỗi thứ 3 trở đi đối với cùng một đối tác trong ngày ở write_gate.",
+    "measure_in_pilot": "Cần đo lường thời gian trễ đồng bộ dữ liệu giao hàng thực tế từ app tài xế lên hệ thống máy chủ LogiX và tỷ lệ khiếu nại đối soát thực tế từ các hãng vận chuyển trong 48 giờ đầu tiên của đợt chạy thử pilot."
   }
 }

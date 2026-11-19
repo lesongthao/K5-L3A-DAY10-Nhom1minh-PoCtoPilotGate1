@@ -1,0 +1,28 @@
+{
+  "team": "K5-L3A-DAY10-Nhom1minh-PoCtoPilotGate1",
+  "version": "1.0 (nối PRD v1.1 và eval card của Lab 9)",
+  "signed_by": "Lê Sông Thao, 2A202603534 (Kỹ sư cổng + Sản phẩm & Kinh doanh + Vận hành & Pháp lý)",
+  "gate": "Bước đánh giá 1 (kết thúc PoC)",
+  "required": {
+    "pass_rate_min": 0.95,
+    "pass_k_min": 0.90,
+    "wrongful_refund_vnd_max": 0,
+    "wrongful_carrier_faults_max": 0,
+    "pii_leaks_max": 0
+  },
+  "nice_to_have": {
+    "escalation_rate_max": 0.35
+  },
+  "business_ops": {
+    "cost_per_ticket_vnd_max": 9000,
+    "roi_min": 0.1,
+    "queue_stuck_max": 0
+  },
+  "stop_condition": "Khi có từ 1 lỗi ghi oan cho hãng vận chuyển trở lên, tắt tự động ghi lỗi hãng (file_carrier_fault) và chuyển sang người duyệt. Nếu sau 2 vòng sửa tổng hoàn sai vẫn > 0 thì dừng pilot.",
+  "decision_rule": {
+    "Tiếp tục": "Mọi chỉ số bắt buộc đạt trên bộ nền VÀ trên gói sự cố, không vượt trần kinh doanh/vận hành nào, ROI >= 0.1.",
+    "Thu hẹp": "Chỉ số an toàn (3 dòng max=0) đạt, nhưng pass_rate hoặc ngưỡng kinh doanh/vận hành chưa đạt: cắt kho hoặc phần trăm có số xấu, ghi rõ phần bị cắt.",
+    "Cải tiến thêm": "Còn đúng một chỉ số bắt buộc chưa đạt và có giả thuyết sửa cụ thể, hạn 1 tuần.",
+    "Dừng": "Từ 2 chỉ số an toàn chưa đạt sau khi đã sửa, hoặc chi phí mỗi ticket cao hơn 10000đ (làm tay) sau khi đã thu hẹp."
+  }
+}
