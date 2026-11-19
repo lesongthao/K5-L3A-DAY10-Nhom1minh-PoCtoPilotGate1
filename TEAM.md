@@ -7,6 +7,8 @@
 - Repo của bàn: `K5-L3A-DAY10-Nhom1minh-PoCtoPilotGate1`
 - Thẻ sự cố đã bốc (S1–S8): S1
 
+**Ghi chú hoàn cảnh:** Tôi thực hiện bài lab một mình và chọn thẻ S1 để làm. Tôi đảm nhận cả ba vai và có sử dụng AI hỗ trợ.
+
 ## Thành viên
 
 Họ tên đầy đủ và MSSV của **mọi** thành viên; thêm dòng nếu cần. Vai: Kỹ sư cổng · Sản phẩm và kinh doanh · Vận hành và pháp lý (README mục 3, phút 0–15).
